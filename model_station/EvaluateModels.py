@@ -448,13 +448,13 @@ def analyse_loglike_NB(test_data, mods):
 def compute_measures(test_data, mods, path='', station=None):
 # mods = EvaluatesModels(training_data, pred_algos, red_algos, red_dim, hparam['is_combined'], **hparam)    
 # compute_measures(test_data, mods, path=str(hparam['log']) + str(hparam['decor']) + str(hparam['mean']) + training_data.env.system, station=[])
-    # measures = ['rmsle', 'rmse', 'mae', 'rmse_norm', 'r2',
+    measures = ['rmsle', 'rmse', 'mae', 'rmse_norm', 'r2']
     #             # 'llP',
     #             # 'llZI',
     #             'dev', 'mpe', 'mape',
     #             #'time'
     #             ]
-    measures=['rmse']
+    # measures=['rmse']
     if 'time' in measures:
         tt = True
     else : tt = False
@@ -736,84 +736,99 @@ if __name__ == '__main__':
     # recompute_all_files('train')
     # recompute_all_files('test')
     #data_train = Data(Environment('Bixi', 'train')).get_partialdata_per(0, 0.8)
-    data_train = Data(Environment('Bixi', 'train'))
+    ud = Environment('Bixi', 'train','regular')
+    train_re = Data(ud)
+    ud = Environment('Bixi', 'validation','regular')
+    validation_re = Data(ud)
+    ud = Environment('Bixi', 'test','regular')
+    test_re = Data(ud)
+
+    ud = Environment('Bixi', 'train','electric')
+    train_el = Data(ud)
+    ud = Environment('Bixi', 'validation','electric')
+    validation_el = Data(ud)
+    ud = Environment('Bixi', 'test','electric')
+    test_el = Data(ud)
+
+
+    # data_train = Data(Environment('Bixi', 'train'))
     # print(data_train.miniOD.shape)
     #data_test = Data(Environment('Bixi', 'train')).get_partialdata_per(0.8, 1)
-    data_test = Data(Environment('Bixi', 'test')) 
+    # data_test = Data(Environment('Bixi', 'test')) 
     #print(data_test)
     # print(data_test.miniOD.shape)
     rmse = []
     mae = []
     r2 = []
-    for d in range (1,50):
+    # for d in range (1,50):
         #print("dim = "+str(d))  
-        red_dim = {
-            'svd': d,
-            'pca': 5,
-            'autoencoder': 5,
-            'kpca': 5,
-            'kmeans': 10,
-            'average': 10,
-            'complete': 10,
-            'weighted': 10,
-            'GM': 10,
-            'SC': 10,
-            'maxkcut': 10,
-            'ODkmeans': 10,
-        }
+    red_dim = {
+        'svd': 20,
+        'pca': 5,
+        'autoencoder': 5,
+        'kpca': 5,
+        'kmeans': 10,
+        'average': 10,
+        'complete': 10,
+        'weighted': 10,
+        'GM': 10,
+        'SC': 10,
+        'maxkcut': 10,
+        'ODkmeans': 10,
+    }
 
-        red = [
-            # 'autoencoder',
+    red = [
+        # 'autoencoder',
+        #'kmeans',
+        'svd',
+        # 'pca',
+        #'id', ####
+            #'sum',
             #'kmeans',
-            'svd',
-            # 'pca',
-            #'id', ####
-                #'sum',
-                #'kmeans',
-                #'svd',
-                #'kmeans',
-                # 'average',
-                # 'complete',
-                # 'weighted',
-                # 'dep-arr',
-                # 'GM',
-                # 'SC',
-                # 'maxkcut',
-                # 'ODkmeans',
-            ]
-        pred = [
-                # 'ARIMA',
-                # 'linear',
-                #'gbt',
-                # 'ridge',
-                #'lasso',
-                # 'svr_lin',
-                # 'svr_poly',
-                # 'svr_rbf',
-                # 'MLP2',
-                # 'MLP',
-                # 'LSTM',
-                # '3gbt',
-                # '2gbt',
-                'gbt',
-                # 'mean',
-                #'randforest',
-                #'randforest',
-                #'gbt',
-                #'gbt',
-                # 'decisiontree',
-            ]
+            #'svd',
+            #'kmeans',
+            # 'average',
+            # 'complete',
+            # 'weighted',
+            # 'dep-arr',
+            # 'GM',
+            # 'SC',
+            # 'maxkcut',
+            # 'ODkmeans',
+        ]
+    pred = [
+            # 'ARIMA',
+            # 'linear',
+            #'gbt',
+            # 'ridge',
+            #'lasso',
+            # 'svr_lin',
+            # 'svr_poly',
+            # 'svr_rbf',
+            # 'MLP2',
+            # 'MLP',
+            # 'LSTM',
+            # '3gbt',
+            # '2gbt',
+            'gbt',
+            # 'mean',
+            #'randforest',
+            #'randforest',
+            #'gbt',
+            #'gbt',
+            # 'decisiontree',
+        ]
 
-        hparam = {
-            'is_model_station': True,
-            'log': False,
-            'mean': False,
-            'load': False, #?s
-            'obj': 'mse',
-            'hours': [],
-            'decor': False,
-            'n_week':4,
-            'is_combined': 0,
+    hparam = {
+        'is_model_station': True,
+        'log': False,
+        'mean': False,
+        'load': False, #?s
+        'obj': 'mse',
+        'hours': [],
+        'decor': False,
+        'n_week':4,
+        'is_combined': 0,
         }    
 
 
@@ -834,17 +849,17 @@ if __name__ == '__main__':
                 
         #starttime = time.time()
         #print("All stations")
-        a = compare_model(data_train  , data_test, pred, red, red_dim, stations=[], **hparam) 
-        # rmse.append(float(a['rmse']))
-        # mae.append(float(a['mae']))
-        # r2.append(float(a['r2']))
-        print("dim: "+str(d))
-        #Sprint(time.time() - starttime)
-        #print(a)
-        # print("RMSE")
-        # print(rmse)
-        # print('mae')
-        # print(mae)
-        # print("r2")
-        # print(r2)
+    a = compare_model(train_re  , test_re , pred, red, red_dim, stations=[], **hparam) 
+    rmse.append(float(a['rmse']))
+    mae.append(float(a['mae']))
+    r2.append(float(a['r2']))
+    # print("dim: "+str(d))
+    #Sprint(time.time() - starttime)
+    #print(a)
+    print("RMSE")
+    print(rmse)
+    print('mae')
+    print(mae)
+    print("r2")
+    print(r2)
         
