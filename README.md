@@ -1,6 +1,6 @@
 ### Pseudocode of simulation
 
-Here we present the pseudocode of the simulation shared-$\mathcal{RE}$. Assuming that $s$ is the number of stations in the network and $h$ is the number of simulated hours, the below presents the description and dimension of the inputs and outputs of the pseudocode.
+Here we present the pseudocode of the simulation $$ \text{shared}-\mathcal{RE}$$. Assuming that $s$ is the number of stations in the network and $h$ is the number of simulated hours, the below presents the description and dimension of the inputs and outputs of the pseudocode.
 
 
 <img src="table.JPG" alt="table" width="700"/>
