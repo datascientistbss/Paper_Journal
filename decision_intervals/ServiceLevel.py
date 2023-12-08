@@ -48,11 +48,23 @@ class ServiceLevel(object):
         self.dict['stations'] = data1.get_stations_ids(None)
         self.dict['capacities'] = data1.get_stations_capacities(None).to_numpy().flatten()
         # self.dict['bike_type'] = data.env.
+        # print("aqui")
+        demand_ele = copy.deepcopy(pd.DataFrame(self.mod2.predict(x=WT), columns=self.dict['cols'])[
+                self.dict['cols']])
+        # print(demand_ele)
+        for s in self.dict['stations']:
+                x = copy.deepcopy((demand_ele['End date '+str(s)]+ demand_ele['Start date '+str(s)])*0.1)
+                demand_ele['End date '+str(s)]= demand_ele['End date '+str(s)] + x
+                demand_ele['Start date '+str(s)]= demand_ele['Start date '+str(s)] + x
+        # print(demand_ele)
+        # print(pd.DataFrame(self.mod1.predict(x=WT), columns=self.dict['cols'])[
+        #         self.dict['cols']].to_numpy())
+        # print(pd.DataFrame(self.mod1.predict(x=WT), columns=self.dict['cols'])[
+        #         self.dict['cols']])
         if predict:
             self.mean1 = pd.DataFrame(self.mod1.predict(x=WT), columns=self.dict['cols'])[
                 self.dict['cols']].to_numpy() #
-            self.mean2 = pd.DataFrame(self.mod2.predict(x=WT), columns=self.dict['cols'])[
-                self.dict['cols']].to_numpy()
+            self.mean2 = demand_ele.to_numpy()
         else:
             print("error")
         #     if config.learning_var.__contains__('Heure'):
@@ -316,8 +328,9 @@ class ServiceLevel(object):
         # print(best_service_ele)
         return best_service_reg,best_service_ele
 
+      
 
-    def compute_service_level_Poisson2(self, available_bikes=None):
+    def compute_service_level_Poisson2(self,model, available_bikes=None):
         #print("Service Level")
         # lambdas = np.cumsum(self.mean,axis=0)
         cum_mean1 = pd.DataFrame(np.cumsum(self.mean1, axis=0), columns=self.dict['cols']) #lista cumulativa por coluna 
@@ -325,6 +338,7 @@ class ServiceLevel(object):
 
         m1 = pd.DataFrame(self.mean1, columns=self.dict['cols']) # viagem previstas para as proximas horas
         m2 = pd.DataFrame(self.mean2, columns=self.dict['cols'])
+
         arr1 = m1[self.dict['arr_cols']].to_numpy() #get the trips of the stations "End data 6000" 
         arr2 = m2[self.dict['arr_cols']].to_numpy()
         dep1 = m1.drop(self.dict['arr_cols'], axis=1).to_numpy() #get the trips of the stations "Start data 6000" 
@@ -380,9 +394,13 @@ class ServiceLevel(object):
                 service_ele[c] = ( service_loc_el+ service_ret_el)/((np.sum(dep2, axis=0) + 0.001)+(np.sum(arr2, axis=0) + 0.001))
                 service_ele[c, c > capacity_ele] = 0    
 
-            # service_joint = service_reg.sum(0)/(service_reg!=0).sum(0).astype(float) + service_ele.sum(0)/(service_ele!=0).sum(0).astype(float)
-            service_joint = service_reg.max(axis=0) + service_ele.max(axis=0)
-            # service_joint = mini(service_reg.max(axis=0) , service_ele.max(axis=0))
+            # Mudar aqui
+            if model ==1:
+                service_joint = service_reg.sum(0)/(service_reg!=0).sum(0).astype(float) + service_ele.sum(0)/(service_ele!=0).sum(0).astype(float)
+            elif model ==2:
+                service_joint = service_reg.max(axis=0) + service_ele.max(axis=0)
+            else:
+                service_joint = service_reg.min(axis=0) + service_ele.min(axis=0)
 
             for j in range(service_joint.shape[0]):
                 if service_joint[j] >= best_service_joint[j]:
@@ -461,9 +479,12 @@ class ServiceLevel(object):
                 # service_ele[c] = ( service_loc_el+ service_ret_el)/((np.sum(dep2, axis=0) + 0.001)+(np.sum(arr2, axis=0) + 0.001))
                 service_ele[c, c > capacity_ele] = 0    
 
-            # service_joint = service_reg.sum(0)/(service_reg!=0).sum(0).astype(float) + service_ele.sum(0)/(service_ele!=0).sum(0).astype(float)
-            service_joint = service_reg.max(axis=0) + service_ele.max(axis=0)
-            # service_joint = mini(service_reg.max(axis=0) , service_ele.max(axis=0))
+            if model ==1:
+                service_joint = service_reg.max(axis=0) + service_ele.max(axis=0)
+            elif model ==2:
+                service_joint = service_reg.sum(0)/(service_reg!=0).sum(0).astype(float) + service_ele.sum(0)/(service_ele!=0).sum(0).astype(float)            
+            else:
+                service_joint = service_reg.min(axis=0) + service_ele.min(axis=0)
 
             for j in range(service_joint.shape[0]):
                 if service_joint[j] >= best_service_joint[j]:
@@ -536,16 +557,31 @@ class ServiceLevel(object):
             correspond to one station
         """
         # if distribution == 'P':
-        if model == 1: 
-            print("model1")
-            service = self.compute_service_level_Poisson()
-        elif model==2:
-            print("model2")
-            service = self.compute_service_level_Poisson2()
-        elif model ==3:
-            print("model3")
-            service = self.compute_service_level_Poisson3()
+        # if model == 1: 
+        #     print("Function Max")
+        #     # service = self.compute_service_level_Poisson()
+        # elif model==2:
+        #     print("Function Avg")
+        #     # service = self.compute_service_level_Poisson2()
+        # elif model ==3:
+        #     print("Function Min")
+        #     # service = self.compute_service_level_Poisson3()
         # else:
+        #     print("error")
+        #     return
+        service  = self.compute_service_level_Poisson2(model=model)
+        # service  = self.compute_service_level_Poisson2_plus(model=model,plus=0.1)
+        
+        # if model == 1: 
+        #     print("model1")
+        #     service = self.compute_service_level_Poisson()
+        # elif model==2:
+        #     print("model2")
+        #     service = self.compute_service_level_Poisson2()
+        # elif model ==3:
+        #     print("model3")
+        #     service = self.compute_service_level_Poisson3()
+        # # else:
         #     mat = self.compute_proba_matrix(distribution)
         #     service = self.compute_service_level_from_proba_matrix(mat, current_capacity)
         return service

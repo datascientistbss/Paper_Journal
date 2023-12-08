@@ -242,11 +242,11 @@ class DecisionIntervals(object):
         inter_target_el = pd.DataFrame(np.zeros((data2.get_stations_capacities(None).shape[0], 7 * self.periods)),
                                     index=data2.get_stations_ids(None), columns=cols_target)
         #Aqui
-        if ext=='model1':
+        if ext=='max':
             model=1
-        elif ext=='model2':
+        elif ext=='avg':
             model=2
-        elif ext=='model3':
+        elif ext=='min':
             model=3
         else:
             print("Error")
@@ -256,10 +256,16 @@ class DecisionIntervals(object):
             for h in range(len(self.hours)): #perido
                 print("day "+str(d))
                 print("period "+str(h))
-                print(i0 + 24 * d + self.hours[h] + tw, end='\r')
-                # print(WT.iloc[i0:])
-                assert (WT['wday'].iloc[i0 + 24 * d + self.hours[h]] == (d - 1) % 7)
+                # print(i0 + 24 * d + self.hours[h] + tw, end='\r')
+                # print("aqui")
 
+                # print(WT['wday'].iloc[i0 + 24 * 0 + self.hours[2]])
+                # print((0 - 1) % 7)
+                assert (WT['wday'].iloc[i0 + 24 * d + self.hours[h]] == (d - 1) % 7)
+                # if WT['wday'].iloc[i0 + 24 * d + self.hours[h]] != (d - 1) % 7:
+                #     print("attention")
+                #     print(WT['wday'].iloc[i0 + 24 * d + self.hours[h]])
+                #     print((d - 1) % 7)
                 # if ext=='model1':
                 #     m1, t1, M1, m2, t2, M2 = self.compute_decision_intervals(WT=
                 #         WT.iloc[i0 + 24 * d + self.hours[h]:i0 + 24 * d + self.hours[h] + tw, :], data1=data1,data2=data2,model=model,
@@ -332,9 +338,9 @@ class DecisionIntervals(object):
         if save:
             # print("Inventory")
             # print(min_max)
-            min_max1.to_csv(data1.env.decision_intervals[:-4] + '_avg_reg_'+str(self.param_beta1)+'_'+str(self.param_beta2)+'_'+str(ext)+'.csv', index=False)
+            min_max1.to_csv(data1.env.decision_intervals[:-4] + '_reg_'+str(self.param_beta1)+'_'+str(self.param_beta2)+'_'+str(ext)+'_plus010.csv', index=False)
 
-            min_max2.to_csv(data2.env.decision_intervals[:-4] + '_avg_ele_'+str(self.param_beta1)+'_'+str(self.param_beta2)+'_'+str(ext)+'.csv', index=False)
+            min_max2.to_csv(data2.env.decision_intervals[:-4] + '_ele_'+str(self.param_beta1)+'_'+str(self.param_beta2)+'_'+str(ext)+'_plus010.csv', index=False)
 
         return min_max1,min_max2
     
@@ -877,9 +883,44 @@ class DecisionIntervals(object):
             else:
                 return 22
         
+
+        num_reg_bikes = 6377
+        num_ele_bikes = 2015
         features = copy.deepcopy(df_re['wday'] * 24 + df_re['Heure'].apply(f)) #vetor onde cada hora tem um numero que representa um intervalo  
-        inv_re = copy.deepcopy(intertarr.loc[features[0], :].to_numpy()) 
-        inv_el = copy.deepcopy(intertare.loc[features[0], :].to_numpy())  #inventorio de tds as estações no primeiro periodo comeca em ótimo (numpy array)
+        ################################ set initial inventory
+        inv_re = copy.deepcopy(np.round(num_reg_bikes * ((intertarr.loc[features[0], :].to_numpy())/(intertarr.loc[features[0], :].sum()))))
+        inv_el = copy.deepcopy(np.round(num_ele_bikes * ((intertare.loc[features[0], :].to_numpy())/(intertare.loc[features[0], :].sum())))) #copy.deepcopy(intertare.loc[features[0], :].to_numpy())  #inventorio de tds as estações no primeiro periodo comeca em ótimo (numpy array)
+        diff_re = num_reg_bikes - np.sum(inv_re)
+        diff_el = num_ele_bikes - np.sum(inv_el)
+        
+        # print("before")
+        # print(np.sum(inv_re))
+        # print(inv_el)
+
+        if diff_re < 0:
+            for a in np.arange(abs(diff_re)):
+                inv_re[np.argmax(inv_re)] = inv_re[np.argmax(inv_re)] - 1
+        elif diff_re > 0 :
+            for a in np.arange(abs(diff_re)):
+                inv_re[np.argmin(inv_re)] = inv_re[np.argmin(inv_re)] + 1
+        
+        if diff_el < 0:
+            for a in np.arange(abs(diff_el)):
+                inv_el[np.argmax(inv_el)] = inv_el[np.argmax(inv_el)] - 1
+        elif diff_el > 0 :
+            for a in np.arange(abs(diff_el)):
+                inv_el[np.argmin(inv_el)] = inv_el[np.argmin(inv_el)] + 1
+                
+        # print("after")
+        # print(np.sum(inv_re))
+        # print(inv_el)
+        
+        if (np.sum(inv_re) != num_reg_bikes) or (np.sum(inv_el) != num_ele_bikes):
+            print("Error! check number of bikes")       
+            return 
+        ###############################################################3
+        
+
         cap = copy.deepcopy(test_data_re.get_stations_capacities(None)) #capacidade de cada estação
         lost_arr_re = copy.deepcopy(np.zeros(mat_re.shape[1])) #shape stations
         lost_dep_re = copy.deepcopy(np.zeros(mat_re.shape[1]))
@@ -892,72 +933,83 @@ class DecisionIntervals(object):
         alert_dep_el = copy.deepcopy(np.zeros(mat_el.shape[1]))
         
         stations_ = test_data_re.get_stations_ids()
-        # print(stations_)
-        # qt_stations_rb = 0
-        empty_stations = 0
-        full_stations = 0
         rebalanced = 0
+        bike_moved_reg = 0
+        bike_moved_ele = 0
         df_result = pd.DataFrame([])
-        # print(reb_type)
-        # return
+        total_bikes_re = 0
+        total_bikes_el = 0
+
+        max_alert = 0
         for i in range(mat_re.shape[0]-1): #per hour
            
             inv_re = copy.deepcopy(inv_re + mat_re[i, :]) # mudando o inventorio de acordo com a demanda
             inv_el = copy.deepcopy(inv_el + mat_el[i, :])
             
+            inv_el_unc = copy.deepcopy(np.zeros(mat_el.shape[1]))
+            inv_el_cha = copy.deepcopy(inv_el)
+
+            for g in np.arange(202):
+                sta_ = random.randint(0, mat_re.shape[1]-1)
+                
+                inv_el_cha[sta_] = copy.deepcopy(inv_el_cha[sta_] - 1)
+                
+                inv_el_unc[sta_] = copy.deepcopy(inv_el_unc[sta_] + 1) 
+            
+
 
             if subs == 1:
                 
-                for e,j in enumerate(inv_el): 
+                for e,j in enumerate(inv_el_cha): 
                     if j<0 and rent_el[i, e]>0 and inv_re[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                             inv_re[e] = copy.deepcopy(inv_re[e] - 1)
-                            inv_el[e] = copy.deepcopy(inv_el[e] + 1)
+                            inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] + 1)
                             
                             if inv_re[e]<=0:
                                 break
                 
                 for e,j in enumerate(inv_re): 
-                    if j<0 and rent_re[i, e]>0 and inv_el[e]>0:
+                    if j<0 and rent_re[i, e]>0 and inv_el_cha[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                             inv_re[e] = copy.deepcopy(inv_re[e] + 1)
-                            inv_el[e] = copy.deepcopy(inv_el[e] - 1)
+                            inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] - 1)
                             
-                            if inv_el[e]<=0:
+                            if inv_el_cha[e]<=0:
                                 break
                 
                 
             elif subs == 2:
                 
                 for e,j in enumerate(inv_re): 
-                    if j<0 and rent_re[i, e]>0 and inv_el[e]>0:
+                    if j<0 and rent_re[i, e]>0 and inv_el_cha[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                                 inv_re[e] = copy.deepcopy(inv_re[e] + 1)
-                                inv_el[e] = copy.deepcopy(inv_el[e] - 1)
+                                inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] - 1)
 
-                                if inv_el[e]<=0:
+                                if inv_el_cha[e]<=0:
                                     break
             elif subs==3:    
-                for e,j in enumerate(inv_el): 
+                for e,j in enumerate(inv_el_cha): 
                     if j<0 and rent_el[i, e]>0 and inv_re[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                                 inv_re[e] = copy.deepcopy(inv_re[e] - 1)
-                                inv_el[e] = copy.deepcopy(inv_el[e] + 1)
+                                inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] + 1)
                                 
                                 if inv_re[e]<=0:
                                     break
             
 
             inv_to = copy.deepcopy(np.where(inv_re<0, 0, inv_re)+np.where(inv_el<0, 0, inv_el))
-            empty_stations = empty_stations + sum((inv_to==0))
-            full_stations = full_stations + sum(((inv_to)==cap))
+            # empty_stations = empty_stations + sum((inv_to==0))
+            # full_stations = full_stations + sum(((inv_to)==cap))
 
             # df_result.at[i,"date"] = df_re['Date/Heure'].iloc[i]
-            # df_result.at[i,cols_inve_re] = inv_re
+            # df_result.at[i,cols_inve_re] = inv_to
             # df_result.at[i,cols_inve_el] = inv_el
             
 
@@ -973,7 +1025,7 @@ class DecisionIntervals(object):
             # df_result.at[i,"alerts"] = sum((inv_re<interminr.loc[features[i],:].to_numpy()).tolist())+sum((inv_re>intermaxr.loc[features[i],:].to_numpy()).tolist())+sum((inv_el<intermine.loc[features[i],:].to_numpy()).tolist())+sum((inv_el>intermaxe.loc[features[i],:].to_numpy()).tolist())
 
             lost_arr_re = lost_arr_re - np.where(inv_re>0, 0, inv_re).tolist()
-            lost_arr_el = lost_arr_el - np.where(inv_el>0, 0, inv_el).tolist()
+            lost_arr_el = lost_arr_el - np.where(inv_el_cha>0, 0, inv_el_cha).tolist()
             
             # df_result.at[i,cols_lost_re] = np.where(inv_re>0, 0, -inv_re).tolist()
             # df_result.at[i,cols_lost_el] = np.where(inv_el>0, 0, -inv_el).tolist()
@@ -1004,23 +1056,190 @@ class DecisionIntervals(object):
             list_alerts_el = [a or b for a, b in zip((inv_el<intermine.loc[features[i],:].to_numpy()), (inv_el>intermaxe.loc[features[i],:].to_numpy()))]
             list_alerts = [ True if a or b else False for (a, b) in zip(list_alerts_re, list_alerts_el)]
             stations_alerts = [q for (q, v) in zip(stations_, list_alerts) if v]
-            
-            # print(type(stations_alerts))
+
+            if len(stations_alerts) > max_alert:
+                max_alert = len(stations_alerts)
             # print(type(stations_alerts))
             # print(len(stations_alerts))
             # # print(reb_type[i])
             # print(random.sample(stations_alerts, int(reb_type[i])).sort())
             # print(len(random.sample(stations_alerts, int(reb_type[i]))))
+            ######################################################################################
             
+            stations_ind = [list(stations_).index(x) for x in stations_alerts]
+            pri1 = abs(inv_re[stations_ind] - intertarr.loc[features[i],stations_alerts])
+            pri2 = abs(inv_el[stations_ind] - intertare.loc[features[i],stations_alerts])
+            
+            pri1.sort_values(ascending=False,inplace=True)
+            pri2.sort_values(ascending=False,inplace=True)
+
+            # print("1")
+            # print(pri1)
+            # print(type(pri1))
+            list_stations_re =  pri1.index.tolist() # stations that raised an alert sort by target deviation from regular inventory
+            list_stations_el =  pri2.index.tolist() # stations that raised an alert sort by target deviation from electric inventory
+
+            # print("2")
+            # print(list_stations_re)
+            stations_ind_re = [list(stations_).index(x) for x in list_stations_re] # indice of the stations that raised an alert in order of priority (regular inventory)
+            stations_ind_el = [list(stations_).index(x) for x in list_stations_el] # indice of the stations that raised an alert in order of priority (regular inventory)
+                
+            # print("3")
+            # print(stations_ind_re)    
+            bikes_rem_re  = inv_re[stations_ind_re] - intertarr.loc[features[i],list_stations_re] # num of bikes to add or remove (regular inventory)
+            bikes_rem_el  = inv_el[stations_ind_el] - intertare.loc[features[i],list_stations_el] # num of bikes to add or remove (electric inventory)
+            
+
+            # print("4")
+            # print(bikes_rem_el)
+            stations_rem_re = [list_stations_re[i] for i,r in enumerate(bikes_rem_re) if r>0 ] 
+            stations_add_re = [a for a in list_stations_re if a not in stations_rem_re]
+
+            stations_rem_el = [list_stations_el[i] for i,r in enumerate(bikes_rem_el) if r>0 ] 
+            stations_add_el = [a for a in list_stations_el if a not in stations_rem_el]
+            # print("5")
+            # print(stations_rem_el)
+            
+            # bikes_add_re = [-b for b in bikes_rem_re if b<0]
+            # bikes_rem_re = [b for b in bikes_rem_re if b>0]
+
+            # bikes_add_el = [-b for b in bikes_rem_el if b<0]
+            # bikes_rem_el = [b for b in bikes_rem_el if b>0]
+
+
+            # df_result.at[i,"Stations_pri_add"] = len(stations_add)
+            # df_result.at[i,"Stations_pri_rem"] = len(stations_rem)
+
+            # print((stations_alerts))
+            # print(len(stations_alerts))
+            # print(reb_type)
+
+            stations_reba =  min(len(stations_alerts), reb_type)
+            # qt_stations_rb = qt_stations_rb + 
+            
+            # ind_rem_r=0
+            # ind_add_r=0
+            # ind_rem_e=0
+            # ind_add_e=0
+            
+            qt_stations_rb_hour = 0
+            stations_rebalanced = []
+
+            for ind in np.arange(stations_reba):
+                
+                # print("Total_reg = "+str(total_bikes_re))
+                # print("Total_ele = "+str(total_bikes_el))
+                
+                if abs(total_bikes_re) >= abs(total_bikes_el):
+
+                    if total_bikes_re <=0:
+                        # print("case A") ##foca em remover bikes regulares 
+                        
+                        if not stations_rem_re: #check if list is empty
+                            break
+                        
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_rem_re[0])] - intertarr.loc[features[i],stations_rem_re[0]]))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_rem_re[0])] - intertare.loc[features[i],stations_rem_re[0]])) 
+       
+                        inv_re[list(stations_).index(stations_rem_re[0])] = copy.deepcopy(intertarr.loc[features[i],stations_rem_re[0]])
+                        inv_el[list(stations_).index(stations_rem_re[0])] = copy.deepcopy(intertare.loc[features[i],stations_rem_re[0]])
+
+                        stations_rebalanced.append(stations_rem_re[0])
+                        
+                        if stations_rem_re[0] in stations_rem_el:
+                            stations_rem_el.remove(stations_rem_re[0])
+                        else:
+                            stations_add_el.remove(stations_rem_re[0])
+
+                        stations_rem_re.pop(0)
+            
+                    else:
+                        # print("case B") ##foca em adicionar bikes regulares 
+                        if not stations_add_re:
+                            break
+
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_add_re[0])] - intertarr.loc[features[i],stations_add_re[0]])) 
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_add_re[0])] - intertare.loc[features[i],stations_add_re[0]]))
+                        
+                        inv_re[list(stations_).index(stations_add_re[0])] = copy.deepcopy(intertarr.loc[features[i],stations_add_re[0]])
+                        inv_el[list(stations_).index(stations_add_re[0])] = copy.deepcopy(intertare.loc[features[i],stations_add_re[0]])
+
+                        stations_rebalanced.append(stations_add_re[0])
+
+                        if stations_add_re[0] in stations_rem_el:
+                            stations_rem_el.remove(stations_add_re[0])
+                        else:
+                            stations_add_el.remove(stations_add_re[0])
+                        
+                        stations_add_re.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour +1
+                else:
+
+                    if total_bikes_el <=0:
+                        # print("case C") ##foca em remover bikes eletricas 
+                        if not stations_rem_el:
+                            break
+                        
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_rem_el[0])] - intertarr.loc[features[i],stations_rem_el[0]]))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_rem_el[0])] - intertare.loc[features[i],stations_rem_el[0]]))
+
+                        inv_re[list(stations_).index(stations_rem_el[0])] = copy.deepcopy(intertarr.loc[features[i],stations_rem_el[0]])
+                        inv_el[list(stations_).index(stations_rem_el[0])] = copy.deepcopy(intertare.loc[features[i],stations_rem_el[0]])
+
+                        stations_rebalanced.append(stations_rem_el[0])
+                        
+                        if stations_rem_el[0] in stations_rem_re:
+                            stations_rem_re.remove(stations_rem_el[0])
+                        else:
+                            stations_add_re.remove(stations_rem_el[0])
+                        
+                        stations_rem_el.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour + 1
+
+                        # return
+                    else:
+                        # print("case D") ##foca em adicionar bikes eletricas 
+                        if not stations_add_el:
+                            break
+
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_add_el[0])] - intertarr.loc[features[i],stations_add_el[0]]))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_add_el[0])] - intertare.loc[features[i],stations_add_el[0]]))
+                        
+                        inv_re[list(stations_).index(stations_add_el[0])] = copy.deepcopy(intertarr.loc[features[i],stations_add_el[0]])
+                        inv_el[list(stations_).index(stations_add_el[0])] = copy.deepcopy(intertare.loc[features[i],stations_add_el[0]])
+
+                        stations_rebalanced.append(stations_add_el[0])
+
+                        if stations_add_el[0] in stations_rem_re:
+                            stations_rem_re.remove(stations_add_el[0])
+                        else:
+                            stations_add_re.remove(stations_add_el[0])
+                        
+                        stations_add_el.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour +1
+                
+                
+            inv_re = np.round(inv_re,0)
+            inv_el = np.round(inv_el,0)
+                # inv_el = copy.deepcopy(inv_el-lost_el) 
+
+            # df_result.at[i,"Rebalanced"] = qt_stations_rb_hour
+            #####################################################################################
             #######################################################################
-            if len(stations_alerts)>int(reb_type[i]):
-                stations_ind = [list(stations_).index(x) for x in stations_alerts]
-                pri1 = abs(inv_re[stations_ind] - intertarr.loc[features[i],stations_alerts])
-                pri2 = abs(inv_el[stations_ind] - intertare.loc[features[i],stations_alerts])
-                pri = pri1+pri2
-                pri.sort_values(ascending=False,inplace=True)
-                stations_alerts =  pri.index[:int(reb_type[i])].tolist()
-                stations_alerts.sort()
+            # if len(stations_alerts)>int(reb_type):
+                # stations_ind = [list(stations_).index(x) for x in stations_alerts]
+                # pri1 = abs(inv_re[stations_ind] - intertarr.loc[features[i],stations_alerts])
+                # pri2 = abs(inv_el[stations_ind] - intertare.loc[features[i],stations_alerts])
+                # pri = pri1+pri2
+                # pri.sort_values(ascending=False,inplace=True)
+                # stations_alerts =  pri.index[:int(reb_type[i])].tolist()
+                # stations_alerts.sort()
             #     # print(stations_alerts)
             #     # return
                 # stations_alerts = random.sample(stations_alerts, int(reb_type[i]))
@@ -1030,17 +1249,21 @@ class DecisionIntervals(object):
             # print(len(stations_alerts))
             # return
 
-            df_result.at[i,'rebalanced'] = len(stations_alerts)
+            # df_result.at[i,'rebalanced'] = len(stations_alerts)
             
-            stations_ind = [list(stations_).index(x) for x in stations_alerts]
+            # stations_ind = [list(stations_).index(x) for x in stations_alerts]
             
-            rebalanced = rebalanced + len(stations_alerts)
+            rebalanced = rebalanced + qt_stations_rb_hour
 
-            inv_re[stations_ind] = intertarr.loc[features[i],stations_alerts] 
-            inv_re = np.round(inv_re,0)
+            # bike_moved_reg = bike_moved_reg + np.sum(abs(inv_re[stations_ind] - intertarr.loc[features[i],stations_alerts] ))
+            # bike_moved_ele = bike_moved_ele + np.sum(abs(inv_el[stations_ind] - intertare.loc[features[i],stations_alerts] ))
             
-            inv_el[stations_ind] = intertare.loc[features[i],stations_alerts] 
-            inv_el = np.round(inv_el,0)
+
+            # inv_re[stations_ind] = intertarr.loc[features[i],stations_alerts] 
+            # inv_re = np.round(inv_re,0)
+            
+            # inv_el[stations_ind] = intertare.loc[features[i],stations_alerts] 
+            # inv_el = np.round(inv_el,0)
 
             inv_re = copy.deepcopy(np.where(inv_re<0, 0, inv_re)) # removendo inventario fantasma
             inv_el = copy.deepcopy(np.where(inv_el<0, 0, inv_el))
@@ -1065,11 +1288,14 @@ class DecisionIntervals(object):
             #     inv_el[stations_ind_el] = intertare.loc[features[i],stations_alerts_el] 
             #     inv_el = np.round(inv_el,0)
         
-        return df_result
-        return sum(lost_arr_re)/sum(sum(rent_re)), sum(lost_dep_re)/sum(sum(return_re)),sum(lost_arr_el)/sum(sum(rent_el)), sum(lost_dep_el)/sum(sum(return_el)),lost_arr_re.sum(),lost_dep_re.sum(),lost_arr_el.sum(),lost_dep_el.sum(),rebalanced,empty_stations,full_stations   
+        # return df_result
+        print("Max alerts is "+str(max_alert))
+        return sum(lost_arr_re)/sum(sum(rent_re)),sum(lost_dep_re)/sum(sum(return_re)),sum(lost_arr_el)/sum(sum(rent_el)),sum(lost_dep_el)/sum(sum(return_el)),(sum(lost_arr_re)+sum(lost_dep_re))/(sum(sum(rent_re))+sum(sum(return_re))), (sum(lost_arr_el)+sum(lost_dep_el))/(sum(sum(rent_el))+sum(sum(return_el))),(sum(lost_arr_re)+sum(lost_dep_re)+sum(lost_arr_el)+sum(lost_dep_el))/(sum(sum(rent_re))+sum(sum(return_re))+sum(sum(rent_el))+sum(sum(return_el))),lost_arr_re.sum()+lost_dep_re.sum()+lost_arr_el.sum()+lost_dep_el.sum(),rebalanced,bike_moved_reg,bike_moved_ele 
+        
+        # return sum(lost_arr_re)/sum(sum(rent_re)), sum(lost_dep_re)/sum(sum(return_re)),sum(lost_arr_el)/sum(sum(rent_el)), sum(lost_dep_el)/sum(sum(return_el)),lost_arr_re.sum(),lost_dep_re.sum(),lost_arr_el.sum(),lost_dep_el.sum(),rebalanced,empty_stations,full_stations   
         # return alert_arr_re.sum(), alert_dep_re.sum(),alert_arr_el.sum(), alert_dep_el.sum(),lost_arr_re.sum(),lost_dep_re.sum(),lost_arr_el.sum(),lost_dep_el.sum(),rebalanced,empty_stations,full_stations
     
-    def alert_lost_demand_bixi_inv(self,test_data_re,test_data_el,intervals, df_re, df_el,subs):
+    def alert_lost_demand_bixi_inv(self,test_data_re,test_data_el,intervals, df_re, df_el,reb_type,subs):
         intermin, intermax, intertar = intervals 
         
         stations_propor_reg = test_data_re.get_stations_proportions_reg()
@@ -1138,9 +1364,50 @@ class DecisionIntervals(object):
             else:
                 return 22
         
+        num_reg_bikes = 6377
+        num_ele_bikes = 2015
         features = copy.deepcopy(df_re['wday'] * 24 + df_re['Heure'].apply(f)) #vetor onde cada hora tem um numero que representa um intervalo  
-        inv_re = copy.deepcopy(np.round(intertar.loc[features[0], :].to_numpy()*stations_propor_reg)) 
-        inv_el = copy.deepcopy(np.round(intertar.loc[features[0], :].to_numpy()*stations_propor_ele))  #inventorio de tds as estações no primeiro periodo comeca em ótimo (numpy array)
+        ################################ set initial inventory
+        inv_re = copy.deepcopy(np.round((num_reg_bikes * (intertar.loc[features[0], :].to_numpy()*stations_propor_reg))/(intertar.loc[features[0], :].to_numpy()*stations_propor_reg).sum()))
+        inv_el = copy.deepcopy(np.round((num_ele_bikes * (intertar.loc[features[0], :].to_numpy()*stations_propor_ele))/(intertar.loc[features[0], :].to_numpy()*stations_propor_ele).sum())) #copy.deepcopy(intertare.loc[features[0], :].to_numpy())  #inventorio de tds as estações no primeiro periodo comeca em ótimo (numpy array)
+        diff_re = num_reg_bikes - np.sum(inv_re)
+        diff_el = num_ele_bikes - np.sum(inv_el)
+        
+        # print("before")
+        # print(np.sum(inv_re))
+        # print(inv_el)
+
+        if diff_re < 0:
+            for a in np.arange(abs(diff_re)):
+                inv_re[np.argmax(inv_re)] = inv_re[np.argmax(inv_re)] - 1
+        elif diff_re > 0 :
+            for a in np.arange(abs(diff_re)):
+                inv_re[np.argmin(inv_re)] = inv_re[np.argmin(inv_re)] + 1
+        
+        if diff_el < 0:
+            for a in np.arange(abs(diff_el)):
+                inv_el[np.argmax(inv_el)] = inv_el[np.argmax(inv_el)] - 1
+        elif diff_el > 0 :
+            for a in np.arange(abs(diff_el)):
+                inv_el[np.argmin(inv_el)] = inv_el[np.argmin(inv_el)] + 1
+                
+        # # print("after")
+        # print(np.sum(inv_re))
+        # print(inv_el)
+        
+        # if (np.sum(inv_re) != num_reg_bikes) or (np.sum(inv_el) != num_ele_bikes):
+        #     print("Error! check number of bikes")       
+        #     return 
+        ###############################################################3
+
+        # features = copy.deepcopy(df_re['wday'] * 24 + df_re['Heure'].apply(f)) #vetor onde cada hora tem um numero que representa um intervalo  
+        # inv_re = copy.deepcopy(np.round(intertar.loc[features[0], :].to_numpy()*stations_propor_reg)) 
+        # inv_el = copy.deepcopy(np.round(intertar.loc[features[0], :].to_numpy()*stations_propor_ele))  #inventorio de tds as estações no primeiro periodo comeca em ótimo (numpy array)
+        df = pd.DataFrame([])
+        # df['inv_ini_re'] = inv_re
+        # df['inv_ini_el'] = inv_el
+        # df.to_csv("initial_inventory_bixi.csv")
+        # return
         cap = copy.deepcopy(test_data_re.get_stations_capacities(None)) #capacidade de cada estação
         # print(intertar.loc[features[0], :])
         # print(inv_re)
@@ -1161,71 +1428,88 @@ class DecisionIntervals(object):
         empty_stations = 0
         full_stations = 0
         rebalanced = 0
+        bike_moved_reg = 0
+        bike_moved_ele = 0
         df_result = pd.DataFrame([])
 
+        total_bikes_re = 0
+        total_bikes_el = 0
 
-
+        max_alert = 0
         for i in range(mat_re.shape[0]-1): #per hour
            
             inv_re = copy.deepcopy(inv_re + mat_re[i, :]) # mudando o inventorio de acordo com a demanda
             inv_el = copy.deepcopy(inv_el + mat_el[i, :])
+            
+            inv_el_unc = copy.deepcopy(np.zeros(mat_el.shape[1]))
+            inv_el_cha = copy.deepcopy(inv_el)
 
-            # print(i)           
+            for g in np.arange(202):
+                sta_ = random.randint(0, mat_re.shape[1]-1)
+                
+                inv_el_cha[sta_] = copy.deepcopy(inv_el_cha[sta_] - 1)
+                
+                inv_el_unc[sta_] = copy.deepcopy(inv_el_unc[sta_] + 1) 
+            
+
+
             if subs == 1:
                 
-                for e,j in enumerate(inv_el): 
+                for e,j in enumerate(inv_el_cha): 
                     if j<0 and rent_el[i, e]>0 and inv_re[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                             inv_re[e] = copy.deepcopy(inv_re[e] - 1)
-                            inv_el[e] = copy.deepcopy(inv_el[e] + 1)
+                            inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] + 1)
                             
                             if inv_re[e]<=0:
                                 break
                 
                 for e,j in enumerate(inv_re): 
-                    if j<0 and rent_re[i, e]>0 and inv_el[e]>0:
+                    if j<0 and rent_re[i, e]>0 and inv_el_cha[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                             inv_re[e] = copy.deepcopy(inv_re[e] + 1)
-                            inv_el[e] = copy.deepcopy(inv_el[e] - 1)
+                            inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] - 1)
                             
-                            if inv_el[e]<=0:
+                            if inv_el_cha[e]<=0:
                                 break
                 
                 
             elif subs == 2:
                 
                 for e,j in enumerate(inv_re): 
-                    if j<0 and rent_re[i, e]>0 and inv_el[e]>0:
+                    if j<0 and rent_re[i, e]>0 and inv_el_cha[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                                 inv_re[e] = copy.deepcopy(inv_re[e] + 1)
-                                inv_el[e] = copy.deepcopy(inv_el[e] - 1)
+                                inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] - 1)
 
-                                if inv_el[e]<=0:
+                                if inv_el_cha[e]<=0:
                                     break
             elif subs==3:    
-                for e,j in enumerate(inv_el): 
+                for e,j in enumerate(inv_el_cha): 
                     if j<0 and rent_el[i, e]>0 and inv_re[e]>0:
                         for m in np.arange(-j):
                             # if random.randint(0, 1) == 1:
                                 inv_re[e] = copy.deepcopy(inv_re[e] - 1)
-                                inv_el[e] = copy.deepcopy(inv_el[e] + 1)
+                                inv_el_cha[e] = copy.deepcopy(inv_el_cha[e] + 1)
                                 
                                 if inv_re[e]<=0:
                                     break
-            # df_result.at[i,"date"] = df_re['Date/Heure'].iloc[i]
-            # df_result.at[i,cols_inve_re] = inv_re
-            # df_result.at[i,cols_inve_el] = inv_el
+                        
+
             
 
             inv_to = copy.deepcopy(np.where(inv_re<0, 0, inv_re)+np.where(inv_el<0, 0, inv_el))
             inv_to2 = copy.deepcopy(inv_re+inv_el)
             
+            df_result.at[i,"date"] = df_re['Date/Heure'].iloc[i]
+            df_result.at[i,cols_inve_re] = inv_to
+            # df_result.at[i,cols_inve_el] = inv_el
 
-            empty_stations = empty_stations + np.count_nonzero(inv_to==0)
-            full_stations = full_stations + np.sum(inv_to==cap)
+            # empty_stations = empty_stations + np.count_nonzero(inv_to==0)
+            # full_stations = full_stations + np.sum(inv_to==cap)
             
             alert_arr = alert_arr + ((inv_to<intermin.loc[features[i],:].to_numpy())).tolist() #somando os alertas de todas as estações
             alert_dep = alert_dep + ((inv_to>intermax.loc[features[i],:].to_numpy())).tolist()
@@ -1234,25 +1518,15 @@ class DecisionIntervals(object):
             # df_result.at[i,cols_aler_re] = (inv_to<intermin.loc[features[i],:].to_numpy()) |  (inv_to>intermax.loc[features[i],:].to_numpy())
 
             lost_arr_re = lost_arr_re - np.where(inv_re>0, 0, inv_re).tolist()
-            lost_arr_el = lost_arr_el - np.where(inv_el>0, 0, inv_el).tolist()
-            # print(inv_el)
-            # print(- np.where(inv_el>0, 0, inv_el).tolist())
-            # print(np.where(inv_re>0, 0, inv_re).tolist())
-            # print(lost_arr_re)
-            # return             
+            lost_arr_el = lost_arr_el - np.where(inv_el_cha>0, 0, inv_el_cha).tolist()
             # df_result.at[i,cols_lost_re] = np.where(inv_re>0, 0, -inv_re).tolist()
             # df_result.at[i,"alerts"] = sum((inv_to<intermin.loc[features[i],:].to_numpy()).tolist()| (inv_to==0))+sum((inv_to>intermax.loc[features[i],:].to_numpy()).tolist())
             # df_result.at[i,"rentals_re"] = sum(rent_re[i, :]) # sum(mat_el[i, :])
             # df_result.at[i,"rentals_el"] = sum(rent_el[i, :]) # sum(mat_re[i, :])
             # df_result.at[i,"returns_re"] = sum(return_re[i, :]) 
             # df_result.at[i,"returns_el"] = sum(return_el[i, :]) 
-            
-
-
             np.seterr(invalid='ignore')
            
-            
-            
             lost = (inv_to-cap)
             lost = np.where(lost<0, 0, lost)
 
@@ -1263,39 +1537,210 @@ class DecisionIntervals(object):
             lost_dep_el = lost_dep_el + lost_el
             
 
-            list_alerts = [a or b for a, b in zip(((inv_to<intermin.loc[features[i],:].to_numpy())|(inv_to==0)), (inv_to>intermax.loc[features[i],:].to_numpy()))]
+            list_alerts = [a or b for a, b in zip(((inv_to<intermin.loc[features[i],:].to_numpy())), (inv_to>intermax.loc[features[i],:].to_numpy()))] #check this later
             # list_alerts_el = [a or b for a, b in zip((inv_el<intermine.loc[features[i],:].to_numpy()), (inv_el>intermaxe.loc[features[i],:].to_numpy()))]
             # list_alerts = [ True if a or b else False for (a, b) in zip(list_alerts_re, list_alerts_el)]
             stations_alerts = [q for (q, v) in zip(stations_, list_alerts) if v]
+            
+
+            if len(stations_alerts) > max_alert:
+                max_alert = len(stations_alerts)
             stations_pro_reg = [q for (q, v) in zip(stations_propor_reg, list_alerts) if v]
             stations_pro_ele = [q for (q, v) in zip(stations_propor_ele, list_alerts) if v]
-            
-            rebalanced = rebalanced + sum(list_alerts)
-            
-            df_result.at[i,'rebalanced'] = sum(list_alerts)
-            # df_result[i,'inv_reg'] = sum(list_alerts)
+            #######################################################################################################################            
 
             stations_ind = [list(stations_).index(x) for x in stations_alerts]
+            pri1 = abs(inv_re[stations_ind] - (intertar.loc[features[i],stations_alerts]*stations_pro_reg))
+            pri2 = abs(inv_el[stations_ind] - (intertar.loc[features[i],stations_alerts]*stations_pro_ele))
             
-            inv_re[stations_ind] = copy.deepcopy(np.round(intertar.loc[features[i],stations_alerts]*stations_pro_reg)) 
-            inv_re = copy.deepcopy(np.round(inv_re,0))
-            inv_el[stations_ind] = copy.deepcopy(np.round(intertar.loc[features[i],stations_alerts]*stations_pro_ele)) 
-            inv_el = copy.deepcopy(np.round(inv_el,0))
+            pri1.sort_values(ascending=False,inplace=True)
+            pri2.sort_values(ascending=False,inplace=True)
+
+           
+            list_stations_re =  pri1.index.tolist() # stations that raised an alert sort by target deviation from regular inventory
+            list_stations_el =  pri2.index.tolist() # stations that raised an alert sort by target deviation from electric inventory
+
+            
+            stations_ind_re = [list(stations_).index(x) for x in list_stations_re] # indice of the stations that raised an alert in order of priority (regular inventory)
+            stations_ind_el = [list(stations_).index(x) for x in list_stations_el] # indice of the stations that raised an alert in order of priority (regular inventory)
+                
+
+            stations_pro_reg = stations_propor_reg[stations_ind_re]
+            stations_pro_ele = stations_propor_ele[stations_ind_el]
+            # print(list_stations_re)
+            # print(stations_pro_reg)
+            # return
+            intertarr = copy.deepcopy (np.round(intertar.loc[features[i],list_stations_re]*stations_pro_reg))
+            intertare = copy.deepcopy (np.floor(intertar.loc[features[i],list_stations_el]*stations_pro_ele))
+
+            # print(intertarr)
+            # print(intertarr[list_stations_re[0]])
+            # return
+            bikes_rem_re  = inv_re[stations_ind_re] - intertarr[list_stations_re] # num of bikes to add or remove (regular inventory)
+            bikes_rem_el  = inv_el[stations_ind_el] - intertare[list_stations_el] # num of bikes to add or remove (electric inventory)
+            
+
+            stations_rem_re = [list_stations_re[i] for i,r in enumerate(bikes_rem_re) if r>0 ] 
+            stations_add_re = [a for a in list_stations_re if a not in stations_rem_re]
+
+            stations_rem_el = [list_stations_el[i] for i,r in enumerate(bikes_rem_el) if r>0 ] 
+            stations_add_el = [a for a in list_stations_el if a not in stations_rem_el]
+        
+
+            # print(stations_rem_re)
+            # print(stations_add_el)
+            # return
+            stations_reba =  min(len(stations_alerts), reb_type)
+           
+            
+            qt_stations_rb_hour = 0
+            stations_rebalanced = []
+
+            for ind in np.arange(stations_reba):
+                
+                # print("Total_reg = "+str(total_bikes_re))
+                # print("Total_ele = "+str(total_bikes_el))
+                
+                if abs(total_bikes_re) >= abs(total_bikes_el):
+
+                    if total_bikes_re <=0:
+                        # print("case A") ##foca em remover bikes regulares 
+                        
+                        if not stations_rem_re: #check if list is empty
+                            break
+                        
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_rem_re[0])] - intertarr[stations_rem_re[0]] ))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_rem_re[0])] - intertare[stations_rem_re[0]] )) 
+       
+                        inv_re[list(stations_).index(stations_rem_re[0])] = copy.deepcopy(intertarr[stations_rem_re[0]])
+                        inv_el[list(stations_).index(stations_rem_re[0])] = copy.deepcopy(intertare[stations_rem_re[0]])
+
+                        stations_rebalanced.append(stations_rem_re[0])
+                        
+                        if stations_rem_re[0] in stations_rem_el:
+                            stations_rem_el.remove(stations_rem_re[0])
+                        else:
+                            stations_add_el.remove(stations_rem_re[0])
+
+                        stations_rem_re.pop(0)
+            
+                    else:
+                        # print("case B") ##foca em adicionar bikes regulares 
+                        if not stations_add_re:
+                            break
+
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_add_re[0])] - intertarr[stations_add_re[0]])) 
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_add_re[0])] - intertare[stations_add_re[0]]))
+                        
+                        inv_re[list(stations_).index(stations_add_re[0])] = copy.deepcopy(intertarr[stations_add_re[0]])
+                        inv_el[list(stations_).index(stations_add_re[0])] = copy.deepcopy(intertare[stations_add_re[0]])
+
+                        stations_rebalanced.append(stations_add_re[0])
+
+                        if stations_add_re[0] in stations_rem_el:
+                            stations_rem_el.remove(stations_add_re[0])
+                        else:
+                            stations_add_el.remove(stations_add_re[0])
+                        
+                        stations_add_re.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour +1
+                else:
+
+                    if total_bikes_el <=0:
+                        # print("case C") ##foca em remover bikes eletricas 
+                        if not stations_rem_el:
+                            break
+                        
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_rem_el[0])] - intertarr[stations_rem_el[0]]))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_rem_el[0])] - intertare[stations_rem_el[0]]))
+
+                        inv_re[list(stations_).index(stations_rem_el[0])] = copy.deepcopy(intertarr[stations_rem_el[0]])
+                        inv_el[list(stations_).index(stations_rem_el[0])] = copy.deepcopy(intertare[stations_rem_el[0]])
+
+                        stations_rebalanced.append(stations_rem_el[0])
+                        
+                        if stations_rem_el[0] in stations_rem_re:
+                            stations_rem_re.remove(stations_rem_el[0])
+                        else:
+                            stations_add_re.remove(stations_rem_el[0])
+                        
+                        stations_rem_el.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour + 1
+
+                        # return
+                    else:
+                        # print("case D") ##foca em adicionar bikes eletricas 
+                        if not stations_add_el:
+                            break
+
+                        total_bikes_re = copy.deepcopy (total_bikes_re + (inv_re[list(stations_).index(stations_add_el[0])] - intertarr[stations_add_el[0]]))
+                        total_bikes_el = copy.deepcopy (total_bikes_el + (inv_el[list(stations_).index(stations_add_el[0])] - intertare[stations_add_el[0]]))
+                        
+                        inv_re[list(stations_).index(stations_add_el[0])] = copy.deepcopy(intertarr[stations_add_el[0]])
+                        inv_el[list(stations_).index(stations_add_el[0])] = copy.deepcopy(intertare[stations_add_el[0]])
+
+                        stations_rebalanced.append(stations_add_el[0])
+
+                        if stations_add_el[0] in stations_rem_re:
+                            stations_rem_re.remove(stations_add_el[0])
+                        else:
+                            stations_add_re.remove(stations_add_el[0])
+                        
+                        stations_add_el.pop(0)
+                        
+                        # qt_stations_rb = qt_stations_rb + 1
+                        qt_stations_rb_hour = qt_stations_rb_hour +1
+                
+                
+            inv_re = np.round(inv_re,0)
+            inv_el = np.round(inv_el,0)
+
+            #######################################################################################################################
+            rebalanced = rebalanced + qt_stations_rb_hour 
+            
+            # df_result.at[i,'rebalanced'] = sum(list_alerts)
+            # df_result[i,'inv_reg'] = sum(list_alerts)
+
+            # stations_ind = [list(stations_).index(x) for x in stations_alerts]
+            
+            # bike_moved_reg = bike_moved_reg + np.sum(abs(inv_re[stations_ind] - copy.deepcopy(np.floor(intertar.loc[features[i],stations_alerts]*stations_pro_reg))))
+            # bike_moved_ele = bike_moved_ele + np.sum(abs(inv_el[stations_ind] - copy.deepcopy(np.ceil(intertar.loc[features[i],stations_alerts]*stations_pro_ele))))
+            # print(abs(inv_re[stations_ind] - copy.deepcopy(np.ceil(intertar.loc[features[i],stations_alerts]*stations_pro_reg))))
+            # print(bike_moved_reg)
+            # print(abs(inv_el[stations_ind] - copy.deepcopy(np.floor(intertar.loc[features[i],stations_alerts]*stations_pro_ele))))
+            # print(bike_moved_ele)
+
+            # return
+
+            # inv_re[stations_ind] = copy.deepcopy(np.floor(intertar.loc[features[i],stations_alerts]*stations_pro_reg)) 
+            # inv_re = copy.deepcopy(np.ceil(inv_re,0))
+            
+            # inv_el[stations_ind] = copy.deepcopy(np.ceil(intertar.loc[features[i],stations_alerts]*stations_pro_ele)) 
+            # inv_el = copy.deepcopy(np.floor(inv_el,0))
             
 
             inv_re = copy.deepcopy(np.where(inv_re<0, 0, inv_re)) # removendo inventario fantasma
             inv_el = copy.deepcopy(np.where(inv_el<0, 0, inv_el))
            
+            inv_re = copy.deepcopy(inv_re-lost_re) # removendo inventario fantasma
+            inv_el = copy.deepcopy(inv_el-lost_el) 
             # inv_re = copy.deepcopy(np.array([ for a,b, in zip(inv_re)])) # mudando o inventorio de acordo com a demanda
             # inv_el = copy.deepcopy(np.where(inv_el:, 0, inv_el))
             # print(np.round(intertar.loc[features[i],stations_alerts]*stations_pro_ele))
+        
         # print(rebalanced)
         # print(lost_arr_re.sum()+lost_dep_re.sum()+lost_arr_el.sum()+lost_dep_el.sum())
         # print(df_result)
         # return
-        return df_result
+        # return df_result
         # return alert_arr.sum(), alert_dep.sum(),lost_arr_re.sum(),lost_dep_re.sum(),lost_arr_el.sum(),lost_dep_el.sum(),rebalanced,empty_stations,full_stations
-        return sum(lost_arr_re)/sum(sum(rent_re)), sum(lost_dep_re)/sum(sum(return_re)),sum(lost_arr_el)/sum(sum(rent_el)), sum(lost_dep_el)/sum(sum(return_el)),lost_arr_re.sum(),lost_dep_re.sum(),lost_arr_el.sum(),lost_dep_el.sum(),rebalanced,empty_stations,full_stations 
+        
+        print("Max alerts is "+str(max_alert))
+        return sum(lost_arr_re)/sum(sum(rent_re)),sum(lost_dep_re)/sum(sum(return_re)),sum(lost_arr_el)/sum(sum(rent_el)),sum(lost_dep_el)/sum(sum(return_el)),(sum(lost_arr_re)+sum(lost_dep_re))/(sum(sum(rent_re))+sum(sum(return_re))), (sum(lost_arr_el)+sum(lost_dep_el))/(sum(sum(rent_el))+sum(sum(return_el))),(sum(lost_arr_re)+sum(lost_dep_re)+sum(lost_arr_el)+sum(lost_dep_el))/(sum(sum(rent_re))+sum(sum(return_re))+sum(sum(rent_el))+sum(sum(return_el))),lost_arr_re.sum()+lost_dep_re.sum()+lost_arr_el.sum()+lost_dep_el.sum(),rebalanced,bike_moved_reg,bike_moved_ele 
         # print("aqui")
         # np.set_printoptions(suppress=True)
         # print(lost_arr_re)

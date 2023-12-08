@@ -32,10 +32,10 @@ def alert_lost_demand_both_inv(test_data_re,test_data_el,reb_type,subs,dis=''):
     # DI_el_max.to_csv('inventory_interval_eletric_'+name+'_max.csv')
     # DI_el_tar.to_csv('inventory_interval_eletric_'+name+'_tar.csv')
 
-    return DI.alert_lost_demand_both_inv(test_data_re= test_data_re, test_data_el= test_data_el, intervals_re= DI.load_intervals(test_data_re, test_data_re.env.decision_intervals, '_max_reg_'+dis),intervals_el= DI.load_intervals(test_data_el, test_data_el.env.decision_intervals, '_max_ele_'+dis), df_re=test_data_re.get_miniOD([]), df_el=test_data_el.get_miniOD([]),reb_type = reb_type,subs=subs)
+    return DI.alert_lost_demand_both_inv(test_data_re= test_data_re, test_data_el= test_data_el, intervals_re= DI.load_intervals(test_data_re, test_data_re.env.decision_intervals, '_reg_'+dis),intervals_el= DI.load_intervals(test_data_el, test_data_el.env.decision_intervals, '_ele_'+dis), df_re=test_data_re.get_miniOD([]), df_el=test_data_el.get_miniOD([]),reb_type = reb_type,subs=subs)
 
 
-def alert_lost_demand_bixi_inv(test_data_re,test_data_el,path,subs):
+def alert_lost_demand_bixi_inv(test_data_re,test_data_el,path,reb_type,subs):
     """
     computes the worst case test value
     :param test_data: env and data
@@ -49,7 +49,7 @@ def alert_lost_demand_bixi_inv(test_data_re,test_data_el,path,subs):
     # di = 'C:/Users/Clara Martins/Documents/Doutorado/Trabalho de Pierre/Pierre Code/Bixi_poly/bixi_intervals/intervals_aug_jul_2019.csv'
     # dis = ''
     DI = DecisionIntervals(test_data_re.env, test_data_el.env, None, None,0.5,0.5)
-    return DI.alert_lost_demand_bixi_inv(test_data_re= test_data_re, test_data_el= test_data_el, intervals= DI.load_intervals(test_data_re, path, ''), df_re=test_data_re.get_miniOD([]), df_el=test_data_el.get_miniOD([]),subs=subs)
+    return DI.alert_lost_demand_bixi_inv(test_data_re= test_data_re, test_data_el= test_data_el, intervals= DI.load_intervals(test_data_re, path, ''), df_re=test_data_re.get_miniOD([]), df_el=test_data_el.get_miniOD([]),reb_type=reb_type,subs=subs)
 
 def alert_lost_demand_hulot_inv(test_data_re,test_data_el,path,reb_type,subs):
     """
@@ -209,125 +209,175 @@ def get_inventory_intervals(train_re,test_re,train_el,test_el,model=3):
             else:
                 print("Error! Model not found!")
 
-def get_code_results(train_re,test_re,train_el,test_el, subs):
+# def get_code_results(train_re,test_re,train_el,test_el, subs):
     
+#     mod1 = ModelStations(train_re.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+#     mod1.train(data=train_re, stations=None) 
+#     mod1.save()
+#     mod1.load()
+#     WH1 = mod1.get_all_factors(test_re)
+#     print(WH1)
 
-    rebalancing_cap = pd.read_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'.csv')['rebalanced']
-    print(rebalancing_cap)
-    beta = [0.1,0.2,0.3]
-    result = pd.DataFrame([])
+#     #For electric bikes
+#     mod2 = ModelStations(train_el.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+#     mod2.train(data=train_el, stations=None) 
+#     mod2.save()
+#     mod2.load()
+#     WH2 = mod2.get_all_factors(test_re)
+#     print(WH2)
+    
+#     result = pd.DataFrame([])
+#     i=0
+#     rebalancing_cap = pd.read_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'.csv')['rebalanced']
+#     # print(rebalancing_cap)
+#     beta = [0.1,0.2,0.3,0.4]
+#     result = pd.DataFrame([])
 
-    i=0
-    for b1 in beta:
-        for b2 in beta:
-            # DI = DecisionIntervals(env1=train_re.env,env2=train_el.env, mod1=mod1,mod2=mod2, beta1=b1, beta2=b2)
-            # WH = mod1.get_all_factors(test_re)
-            # DI.compute_min_max_data(WH, test_re,test_el, True, **{'distrib': ''})
-            results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type = rebalancing_cap,subs=subs,dis='_max_'+str(b1)+'_'+str(b2)+'_') 
+#     i=0
+#     for b1 in beta:
+#         for b2 in beta:
+#             # DI = DecisionIntervals(env1=train_re.env,env2=train_el.env, mod1=mod1,mod2=mod2, beta1=b1, beta2=b2)
+#             # WH = mod1.get_all_factors(test_re)
+#             # DI.compute_min_max_data(WH, test_re,test_el, True, **{'distrib': ''})
+#             results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type = rebalancing_cap,subs=subs,dis='_max_'+str(b1)+'_'+str(b2)+'_') 
             
-            # create_inventory_intervals(alpha_reg=alpha_reg[i],beta_reg=beta_reg[i],alpha_ele=alpha_ele[i],beta_ele=beta_ele[i],train_re=train_re,validation_re=test_re,train_el=train_el,validation_el=test_el)
+#             # create_inventory_intervals(alpha_reg=alpha_reg[i],beta_reg=beta_reg[i],alpha_ele=alpha_ele[i],beta_ele=beta_ele[i],train_re=train_re,validation_re=test_re,train_el=train_el,validation_el=test_el)
                         
-            # results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type = reb_type, name= names[i]) 
-            # results_code.to_csv('test_results/result_test_version_'+reb_type+'_per_hour_station_'+names[i]+'.csv')
-            # result.at[i,"reb_type"] = 2
-            # result.at[i,"alpha_re"] = alpha_reg[i]
-            result.at[i,"beta_re"] = b1
-            # result.at[i,"alpha_el"] = alpha_ele[i]
-            result.at[i,"beta_el"] = b2
-            result.at[i,"total_alert"] = results_code[0] + results_code[1] +results_code[2] +results_code[3]
-            result.at[i,"alert_arr_regular"] = results_code[0]
-            result.at[i,"alert_dep_regular"] = results_code[1]
-            result.at[i,"alert_arr_electric"] = results_code[2]
-            result.at[i,"alert_dep_electric"] = results_code[3]
-            result.at[i,"alert_regular"] = results_code[0]+ results_code[1]
-            result.at[i,"alert_electric"] = results_code[2]+ results_code[3]
-            result.at[i,"total_lost"] = results_code[4] + results_code[5] + results_code[6] + results_code[7] 
-            result.at[i,"lost_arr_regular"] = results_code[4]
-            result.at[i,"lost_dep_regular"] = results_code[5]
-            result.at[i,"lost_arr_electric"] = results_code[6]
-            result.at[i,"lost_dep_electric"] = results_code[7]
-            result.at[i,"lost_regular"] = results_code[4]+ results_code[5]
-            result.at[i,"lost_electric"] = results_code[6]+ results_code[7]
-            result.at[i,"nb_rebalanced"] = results_code[8]
-            result.at[i,"empty_stations"] = results_code[9]
-            result.at[i,"full_stations"] = results_code[10]
-            i=i+1
-            print(result)
-    # result.to_csv('test_results_new/result_test_ours_avg_new_model_mostunbalanced_subs_'+str(subs)+'.csv')
+#             # results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type = reb_type, name= names[i]) 
+#             # results_code.to_csv('test_results/result_test_version_'+reb_type+'_per_hour_station_'+names[i]+'.csv')
+#             # result.at[i,"reb_type"] = 2
+#             # result.at[i,"alpha_re"] = alpha_reg[i]
+#             result.at[i,"beta_re"] = b1
+#             # result.at[i,"alpha_el"] = alpha_ele[i]
+#             result.at[i,"beta_el"] = b2
+#             result.at[i,"total_alert"] = results_code[0] + results_code[1] +results_code[2] +results_code[3]
+#             result.at[i,"alert_arr_regular"] = results_code[0]
+#             result.at[i,"alert_dep_regular"] = results_code[1]
+#             result.at[i,"alert_arr_electric"] = results_code[2]
+#             result.at[i,"alert_dep_electric"] = results_code[3]
+#             result.at[i,"alert_regular"] = results_code[0]+ results_code[1]
+#             result.at[i,"alert_electric"] = results_code[2]+ results_code[3]
+#             result.at[i,"total_lost"] = results_code[4] + results_code[5] + results_code[6] + results_code[7] 
+#             result.at[i,"lost_arr_regular"] = results_code[4]
+#             result.at[i,"lost_dep_regular"] = results_code[5]
+#             result.at[i,"lost_arr_electric"] = results_code[6]
+#             result.at[i,"lost_dep_electric"] = results_code[7]
+#             result.at[i,"lost_regular"] = results_code[4]+ results_code[5]
+#             result.at[i,"lost_electric"] = results_code[6]+ results_code[7]
+#             result.at[i,"nb_rebalanced"] = results_code[8]
+#             result.at[i,"empty_stations"] = results_code[9]
+#             result.at[i,"full_stations"] = results_code[10]
+#             i=i+1
+#             print(result)
+#             result.to_csv('test_results_new/result_test_ours_avg_new_model_mostunbalanced_subs_'+str(subs)+'.csv')
+
+def get_code_results(train_re,test_re,train_el,test_el, ext,subs,b1,b2):
+    # mod1 = ModelStations(train_re.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+    # mod1.train(data=train_re, stations=None) 
+    # mod1.save()
+    # mod1.load()
+    # WH1 = mod1.get_all_factors(test_re)
+    # print(WH1)
+
+    # #For electric bikes
+    # mod2 = ModelStations(train_el.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+    # mod2.train(data=train_el, stations=None) 
+    # mod2.save()
+    # mod2.load()
+    # WH2 = mod2.get_all_factors(test_re)
+    # print(WH2)
+
+    np.set_printoptions(suppress=True)
+    rebalancing_cap = pd.read_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'_round_regular.csv')['rebalanced']
+    # print(rebalancing_cap)
+    
+    i=0
+    print(ext)
+    print("Sub = "+str(subs))
+
+    results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type =50,subs=subs,dis=str(b1)+'_'+str(b2)+'_'+str(ext)+'_plus010')
+    # print(results_code)
+    # results_code.to_csv('test_revision/inv_ours_subs_'+str(subs)+'_model_'+str(ext)+'.csv')
+
 
 def get_code_results1(train_re,test_re,train_el,test_el, ext,subs):
-    
+    mod1 = ModelStations(train_re.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+    mod1.train(data=train_re, stations=None) 
+    mod1.save()
+    mod1.load()
+    WH1 = mod1.get_all_factors(test_re)
+    print(WH1)
+
+    #For electric bikes
+    mod2 = ModelStations(train_el.env, 'svd', 'gbt', dim=20, **{'var': True}) #checar aqui
+    mod2.train(data=train_el, stations=None) 
+    mod2.save()
+    mod2.load()
+    WH2 = mod2.get_all_factors(test_re)
+    print(WH2)
+
     np.set_printoptions(suppress=True)
-    rebalancing_cap = pd.read_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'.csv')['rebalanced']
-    print(rebalancing_cap)
+    # rebalancing_cap = pd.read_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'_round_regular.csv')['rebalanced']
+    # print(rebalancing_cap)
     # beta = [0.1,0.2,0.3]
     beta = [0.1,0.2,0.3,0.4]
+    beta_new = [0.1,0.2,0.3,0.4,0.5,0.6,0.7]
     # beta=[0.0.1]
     result = pd.DataFrame([])
     
     i=0
     print(ext)
     print("Sub = "+str(subs))
-    # for b1 in beta:
-    #     for b2 in beta:
-    for b1 in [0.2]:
-        for b2 in [0.2]:
+    flag=0
+    for b1 in beta_new:
+        for b2 in beta_new:
+    # for b1 in [0.2]:
+    #     for b2 in [0.2]:
     #         # results_code = []
             # for x in np.arange(5):
             #     results_code.append(alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type =rebalancing_cap,subs=subs,dis=str(b1)+'_'+str(b2)+'_'+str(ext)))
                 
             #     # results_code = pd.concat([results_code,results_code1])
             # results_code = np.mean(results_code,axis=0)
+            # flag = flag+1
+            # if flag <= 29:
+            #     print("Skip ("+str(b1)+","+str(b2)+")")
+            #     continue
 
-            results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type =rebalancing_cap,subs=subs,dis=str(b1)+'_'+str(b2)+'_'+str(ext))
-            print(results_code)
-            results_code.to_csv('test_results_new/total_number_rebalancing_operations_ours_subs_'+str(subs)+'_new.csv')  
-            
-            
-    #         result.at[i,"beta_re"] = b1
-    #         result.at[i,"beta_el"] = b2
-    #         # result.at[i,"total_alert"] = results_code[0] + results_code[1] +results_code[2] +results_code[3]
-    #         # result.at[i,"alert_arr_regular"] = results_code[0]
-    #         # result.at[i,"alert_dep_regular"] = results_code[1]
-    #         # result.at[i,"alert_arr_electric"] = results_code[2]
-    #         # result.at[i,"alert_dep_electric"] = results_code[3]
-    #         # result.at[i,"alert_regular"] = results_code[0]+ results_code[1]
-    #         # result.at[i,"alert_electric"] = results_code[2]+ results_code[3]
-    #         # result.at[i,"total_lost"] = results_code[4] + results_code[5] + results_code[6] + results_code[7] 
-    #         # result.at[i,"lost_arr_regular"] = results_code[4]
-    #         # result.at[i,"lost_dep_regular"] = results_code[5]
-    #         # result.at[i,"lost_arr_electric"] = results_code[6]
-    #         # result.at[i,"lost_dep_electric"] = results_code[7]
-    #         # result.at[i,"lost_regular"] = results_code[4]+ results_code[5]
-    #         # result.at[i,"lost_electric"] = results_code[6]+ results_code[7]
-    #         # result.at[i,"nb_rebalanced"] = results_code[8]
-    #         # result.at[i,"empty_stations"] = results_code[9]
-    #         # result.at[i,"full_stations"] = results_code[10]
-    #         # result.at[0,"percen_mean_total_lost"]    = (results_code[0] + results_code[1] + results_code[2] + results_code[3])/4
-    #         result.at[i,"total_lost"] = results_code[4] + results_code[5] + results_code[6] + results_code[7] 
+            # if (b1 in beta) and (b2 in beta):
+            #     print("Skip ("+str(b1)+","+str(b2)+")")
+            #     continue
 
-    #         result.at[i,"percen_mean_regular_lost"]  = (results_code[0] + results_code[1])/2
-    #         result.at[i,"percen_mean_electric_lost"] = (results_code[2] + results_code[3])/2
-    #         result.at[i,"percen_lost_arr_regular"] = results_code[0]
-    #         result.at[i,"percen_lost_dep_regular"] = results_code[1]
-    #         result.at[i,"percen_lost_arr_electric"] = results_code[2]
-    #         result.at[i,"percen_lost_dep_electric"] = results_code[3]
+            # print("Computing ("+str(b1)+","+str(b2)+")")
+            # DI = DecisionIntervals(env1=train_re.env,env2=train_el.env, mod1=mod1,mod2=mod2, beta1=b1, beta2=b2)
+            # WH = mod1.get_all_factors(test_re)
+            # print(WH['Date/Heure'])
+            # DI.compute_min_max_data(WH, test_re,test_el,ext, True, **{'distrib': ''})
+            results_code = alert_lost_demand_both_inv(test_data_re=test_re,test_data_el=test_el,reb_type =50,subs=subs,dis=str(b1)+'_'+str(b2)+'_'+str(ext)+'_plus010')
+            # print(results_code)
+            # results_code.to_csv('test_revision/inv_ours_subs_'+str(subs)+'.csv')  
             
-    #         result.at[i,"alert_regular"] = results_code[0]+ results_code[1]
-    #         result.at[i,"alert_electric"] = results_code[2]+ results_code[3]
             
-    #         result.at[i,"lost_arr_regular"] = results_code[4]
-    #         result.at[i,"lost_dep_regular"] = results_code[5]
-    #         result.at[i,"lost_arr_electric"] = results_code[6]
-    #         result.at[i,"lost_dep_electric"] = results_code[7]
-    #         result.at[i,"lost_regular"] = results_code[4]+ results_code[5]
-    #         result.at[i,"lost_electric"] = results_code[6]+ results_code[7]
-    #         result.at[i,"nb_rebalanced"] = results_code[8]
-    #         result.at[i,"empty_stations"] = results_code[9]
-    #         result.at[i,"full_stations"] = results_code[10]
-    #         i=i+1
-    #         print(result)
-    # # result.to_csv('test_results_new/per_result_test_ours_max_new_model_subs_'+str(subs)+'_'+str(ext)+'_newtest_mostunbalanced.csv')
+            result.at[i,"beta_re"] = b1
+            result.at[i,"beta_el"] = b2
+            result.at[i,"subs"] = subs
+            result.at[i,"total_lost"] = results_code[7] 
+
+            result.at[i,"percen_total_lost"] = results_code[6] 
+            result.at[i,"percen_regular_lost"]  = results_code[4] 
+            result.at[i,"percen_electric_lost"] = results_code[5] 
+            result.at[i,"percen_lost_arr_regular"] = results_code[0]
+            result.at[i,"percen_lost_dep_regular"] = results_code[1]
+            result.at[i,"percen_lost_arr_electric"] = results_code[2]
+            result.at[i,"percen_lost_dep_electric"] = results_code[3]
+            result.at[i,"nb_rebalanced"] = results_code[8]
+            result.at[i,"bikes_moved_reg"] = results_code[9]
+            result.at[i,"bikes_moved_ele"] = results_code[10]
+            result.at[i,"bikes_moved_totak"] = results_code[9]+results_code[10]
+            print(result)
+            i=i+1
+            # print(result)
+            result.to_csv('test_revision/test_our_'+ext+'_model_subs_'+str(subs)+'_plus010_new.csv')
   
     
 def get_bixi_results(test_re,test_el):
@@ -336,9 +386,9 @@ def get_bixi_results(test_re,test_el):
     path = 'C:/Users/Clara/Documents/Doutorado/Trabalho de Pierre/Clara Code/Bixi3/bixi_intervals/bixi_intervall_2021-2022_new.csv'
     result = pd.DataFrame([])
     for subs in [0,1,2,3]:
-        results_code = alert_lost_demand_bixi_inv(test_data_re=test_re,test_data_el=test_el,path=path,subs=subs)
-        print(results_code)
-        results_code.to_csv('test_results_new/total_number_rebalancing_operations_subs_'+str(subs)+'_new.csv')          
+        results_code = alert_lost_demand_bixi_inv(test_data_re=test_re,test_data_el=test_el,path=path,reb_type=50,subs=subs)
+        # print(results_code)
+        # results_code.to_csv('test_revision/inv_total_number_rebalancing_operations_subs_'+str(subs)+'_round_electric.csv')          
         # result.at[0,"total_alert"] = results_code[0] + results_code[1] 
         # result.at[0,"alert_arr"] = results_code[0]
         # result.at[0,"alert_dep"] = results_code[1]
@@ -355,25 +405,28 @@ def get_bixi_results(test_re,test_el):
         # result.at[0,"alert_dep"] = results_code[1]
         
 
-        # result.at[subs,"subs"] = subs
-        # result.at[subs,"total_lost"] = results_code[4] + results_code[5] + results_code[6] + results_code[7] 
-        # result.at[subs,"percen_mean_regular_lost"]  = (results_code[0] + results_code[1])/2
-        # result.at[subs,"percen_mean_electric_lost"] = (results_code[2] + results_code[3])/2
-        # result.at[subs,"percen_lost_arr_regular"] = results_code[0]
-        # result.at[subs,"percen_lost_dep_regular"] = results_code[1]
-        # result.at[subs,"percen_lost_arr_electric"] = results_code[2]
-        # result.at[subs,"percen_lost_dep_electric"] = results_code[3]
+        result.at[subs,"subs"] = subs
+        result.at[subs,"total_lost"] = results_code[7] 
+
+        result.at[subs,"percen_total_lost"] = results_code[6] 
+        result.at[subs,"percen_regular_lost"]  = results_code[4] 
+        result.at[subs,"percen_electric_lost"] = results_code[5] 
+        result.at[subs,"percen_lost_arr_regular"] = results_code[0]
+        result.at[subs,"percen_lost_dep_regular"] = results_code[1]
+        result.at[subs,"percen_lost_arr_electric"] = results_code[2]
+        result.at[subs,"percen_lost_dep_electric"] = results_code[3]
         
         
         # result.at[subs,"lost_arr_regular"] = results_code[4]
         # result.at[subs,"lost_dep_regular"] = results_code[5]
         # result.at[subs,"lost_arr_electric"] = results_code[6]
         # result.at[subs,"lost_dep_electric"] = results_code[7]
-        # result.at[subs,"nb_rebalanced"] = results_code[8]
-        # result.at[subs,"empty_stations"] = results_code[9]
-        # result.at[subs,"full_stations"] = results_code[10]
-        # print(result)
-    # result.to_csv('test_results_new/per_result_test_bixi_new_model_subs_'+str(subs)+'_newtest.csv')          
+        result.at[subs,"nb_rebalanced"] = results_code[8]
+        result.at[subs,"bikes_moved_reg"] = results_code[9]
+        result.at[subs,"bikes_moved_ele"] = results_code[10]
+        result.at[subs,"bikes_moved_totak"] = results_code[9]+results_code[10]
+        print(result)
+    result.to_csv('test_revision/per_result_test_bixi_new_model_subs_'+str(subs)+'_round_none.csv')          
     
 def get_hulot_results(test_re,test_el,subs):
     
@@ -483,17 +536,39 @@ def compute_scores_def(train_re:Data, validation_re:Data,test_re:Data,train_el:D
     # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model3',subs=1)
     # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model3',subs=2)
     # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model3',subs=3)    # get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,subs=1)
+    # get_bixi_results(test_re=test_re,test_el=test_el)
+    # func= "max"
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=1)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=2)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=3)  
+    # func= "avg"
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=1)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=2)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=3)  
     
+
+    func= "max"
+    get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0,b1=0.4,b2=0.3)
+    get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=1,b1=0.4,b2=0.2)
+    get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=2,b1=0.3,b2=0.5)
+    get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=3,b1=0.4,b2=0.3)  
+    # func= "avg"
+    # get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0,b1=0.4,b2=0.5)
+    # get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=1,b1=0.4,b2=0.4)
+    # get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=2,b1=0.3,b2=0.5)
+    # get_code_results(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=3,b1=0.4,b2=0.3)  
     
-    get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model2',subs=0)  
-    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model2',subs=1)
-    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model2',subs=2)
-    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext='model2',subs=3)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=0)
+    # get_code_results1(train_re=train_re,test_re=test_re,train_el=train_el,test_el=test_el,ext=func,subs=3)
+
     
 
     # get_bixi_results(test_re=test_re,test_el=test_el)
-    
-
+    # 
+    # get_bixi_results(test_re=test_re,test_el=test_el,subs=0)
     # get_bixi_results(test_re=test_re,test_el=test_el,subs=1)
     # get_bixi_results(test_re=test_re,test_el=test_el,subs=2)
     # get_bixi_results(test_re=test_re,test_el=test_el,subs=3)
